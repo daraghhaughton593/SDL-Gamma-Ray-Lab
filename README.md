@@ -15,7 +15,7 @@
 - - The calibration routine for each detector is basically the same process.
 
 # Detectors used: 
-- i) CdTe (Cadmium Telluride) 
-- ii) NaTI (Soidum Thallumide) 
+- i) CdTe (Cadmium Telluride)  - Distance: 10.6 cm
+- ii) NaTI (Soidum Thallumide)  - Distance: 16 cm
 
 
