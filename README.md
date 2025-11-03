@@ -13,4 +13,6 @@
 
 # Detectors used: 
 - i) CdTe (Cadmium Telluride)
-- ii)
+- ii) NaTI (Soidum Thallumide)
+
+
