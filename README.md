@@ -12,7 +12,7 @@
 - iv) extract channel value for peak centre from fit params (b in above code) 
 
 # Detectors used: 
-- i) CdTe (Cadmium Telluride)
-- ii) NaTI (Soidum Thallumide)
+- i) CdTe (Cadmium Telluride) 
+- ii) NaTI (Soidum Thallumide) 
 
 
