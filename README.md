@@ -9,7 +9,10 @@
       - def Gau1(data, a, b, c, h):
           return (a * np.exp(-(data - b)**2 / (2 * c**2))) + h
 
-- iv) extract channel value for peak centre from fit params (b in above code) 
+- iv) extract channel value for peak centre from fit params (b in above code)
+
+- Notes:
+- - The calibration routine for each detector is basically the same process.
 
 # Detectors used: 
 - i) CdTe (Cadmium Telluride) 
