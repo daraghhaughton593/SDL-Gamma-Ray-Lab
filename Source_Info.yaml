@@ -26,7 +26,7 @@ Detectors:
 Distances:
   CdTe: [0.107]
   NaI: [0.160]
-  BGO: [0.160]
+  BGO: [0.150]
 
 Sizes:
   CdTe: [5, 1]
@@ -35,6 +35,7 @@ Sizes:
 
 
   
+
 
 
 
