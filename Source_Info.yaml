@@ -17,7 +17,17 @@ Activities:
   Am: [11.16, 0.558]
   Cs: [11.16, 0.41292]
 
-Masses:
-  Co: 
+Detectors:
+  - CdTe
+  - NaI
+  - BGO
+
+
+Distances:
+  CdTe: [0.107]
+  NaI: [0.160]
+  BGO: [0.160]
+
   
-  
+
+
