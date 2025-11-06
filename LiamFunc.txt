@@ -1,0 +1,141 @@
+
+def microCi_2_Bq(microCi):
+    """
+    A function that converts from micro Curies to Becquerels.
+
+    Inputs:
+    microCi - Float: activity of source in microCi
+
+    Outputs:
+    Bq - Float: activity of the source in Becquerels
+    
+    """
+    Bq = microCi*37_000
+    return Bq
+
+#######
+
+def activity(Element):
+    """
+    Compute activites of a source at time of measurments.
+
+    Input:
+    Element - String: element you wish to compute activity for,
+                      (Am, Ba, Co, Cs)
+
+    Output:
+    A - Float: The activity of the source at the time of measurement (05/11/25)
+    
+    """
+    
+    #load the data
+    data = load_yaml('Source_Info.yaml')
+    
+    #load the activities and half-lives
+    A0_list = data['Activities']
+    halflives = data['Half-Life']
+
+    #iterate over keys to get the element
+    for key in A0_list:
+        if key == Element:
+            A0 = A0_list[key]
+            A0 = float(A0[0])
+            hl = halflives[key]
+            hl = hl[0]
+            break  # stop looping once found
+            
+    #warning if string input is not an element in the yaml file
+    if A0_list is None:
+        print('WARNING: No Detector found')
+        return None
+
+        
+    lam = decayconst(hl)
+    A0_bq = microCi_2_Bq(A0) #convert from micro Curies to bequerels
+    t = 1_449_446_148 #number of seconds passed since A0 was measured 
+    A = A0_bq * np.exp(-lam * t)
+    return A
+
+#######
+
+def decayconst(halflife):
+    """
+    Calculates the Decay constant of an element once given its half-life in years.
+
+    Inputs:
+    halflife - Float: Halflife of element in years.
+
+    Outputs:
+    decay_constant - Float: Decay constant,  unit s^-1
+    
+    """
+
+    halflifesec = halflife*365.25*24*60*60
+    decay_constant = np.log(2)/ halflifesec
+    
+    return decay_constant
+
+#######
+
+def Angular_Detector_size(diam, h, dist, theta):
+    """
+    Compute the approximate solid angle subtended by a cylindrical detector.
+
+    Inputs: 
+    diam - Float: diameter of detector in m
+    h - Float: height of the detetctor in m
+    dist-Float: Distance to detector in m
+    theta - Float: angle the detector is at in degrees
+
+    Output: 
+    omega - Float: Angular size of detector in steridians
+    
+    """
+    
+    theta = theta*np.pi/180
+    A = np.pi*(diam/2)**2*np.cos(theta)+diam*h*np.sin(theta)
+    omega = A/(dist**2)
+    return omega
+  
+#######
+ 
+def Solid_Angle(detector, theta):
+    """
+    Function that takes a detector type and orientation angle,
+    and returns the geometry factor 'G'
+    (i.e., the fraction of the full spherical emission that the detector sees).
+
+    Inputs: 
+    detector - String: type of detector used
+    theta - Float: angle in degrees that the detector was placed
+
+    Outputs:
+    Frac - Float: Fraction of the full spherical emission that the detector sees.
+                  Aka the Geometry factor 'G'
+    """
+
+    
+    data = load_yaml('Source_Info.yaml')
+    
+    Distances = data['Distances']
+    
+    distance = None
+    Sizes = None
+    
+    for key in Distances:
+        if key == detector:
+            distance = Distances[key]
+            distance = float(distance[0])
+            Sizes = data['Sizes'][detector]
+            break  # stop looping once found
+    
+    if distance is None:
+        print('WARNING: No Detector found')
+        return None
+    r,h = Sizes
+    r, h = r/1000, h/1000
+    
+    G = (Angular_Detector_size(r,h,distance,15))/(4*np.pi)
+    return G
+     
+
