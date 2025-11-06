@@ -195,18 +195,18 @@ def resfinder(file, T, guess, title, detname, gain, offset):
   Res = (fwhmkev / energyatpeak1) * 100
   print(f'Detector Resolution: {Res:.3f}%')
 
-  return Res
+  return Res, fwhmkev
 
 #######
 
-def resvenergyplotter(Reslist, energieslist):
-  if len(Reslist) == len(energieslist):
-    plt.scatter(energies, Reslist)
+def resvenergyplotter(fwhmlist, energieslist):
+  if len(fwhmlist) == len(energieslist):
+    plt.scatter(energies, fwhmlist)
     plt.xscale('log')
     plt.yscale('log')
-    plt.grid(True)
     plt.xlabel('Known Energy Values (keV)')
-    plt.ylabel('Resolutions')
+    plt.ylabel('FWHM (keV)')
+    plt.grid(True, which='both')
     plt.show()
 
 
@@ -231,4 +231,5 @@ def filenumtoangle(filename):
   return angle
 
 filenumtoangle('Cs15degfile')
+
 
