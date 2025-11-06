@@ -17,6 +17,13 @@ Activities:
   Am: [11.16, 0.558]
   Cs: [11.16, 0.41292]
 
+Half-Life:
+  Co: [5.2714]
+  Ba: [10.537]
+  Am: [432.2]
+  Cs: [30.09]
+  
+
 Detectors:
   - CdTe
   - NaI
@@ -35,6 +42,7 @@ Sizes:
 
 
   
+
 
 
 
