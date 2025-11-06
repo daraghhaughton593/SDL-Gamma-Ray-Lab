@@ -1,0 +1,222 @@
+def Gau1(data, a, b, c):
+  return (a * np.exp(-(data - b)**2 / (2 * c**2)))
+
+#########
+
+def line(x, a, b):
+  return a * x + b
+
+#########
+
+def paramsgenerator(counts, max, channel):
+  fit_params = lmfit.Parameters()
+  amp = counts.max()
+  center = max
+  halfh = amp/2
+  inds = np.where(counts >= halfh)[0]
+  fwhm = channel.iloc[inds[-1]] - channel.iloc[inds[0]]
+  sig = fwhm / 2.355
+
+  fit_params.add('amp', value=amp, min = 0)
+  fit_params.add('cen', value=center, min = center - 20, max = center + 20)
+  fit_params.add('wid', value=sig, min = 0.5)
+
+  return fit_params, fwhm, sig
+
+#########
+
+def myfunc(params, x, data):
+    amp = params['amp'].value
+    cen = params['cen'].value
+    wid = params['wid'].value
+
+    model = Gau1(x, amp, cen, wid)
+
+    return model - data
+
+#########
+
+def peakfinder(file, guess, livetime, title, detname, T1, dec = None):
+  channel = file.Channel
+  counts = file.Counts
+
+  n_peaks = 10
+  top = counts.nlargest(n_peaks).index
+
+  maxone = top[0]
+  maxtwo = None
+
+  for i in range(1, n_peaks):
+      if abs(top[i] - maxone) >= 5:
+          maxtwo = top[i]
+          break
+
+  if np.abs(maxone - guess) < 50:
+    channelone = maxone
+    print(f'Initial peak estimate good...{maxone}')
+
+  elif np.abs(maxone - guess) > 50:
+    channelone = maxtwo
+    print(f'Initial peak estimate not good, going with second peak... {maxtwo}')
+
+  else:
+    print('Warning: Guesses bad - No estimation of Peak center')
+
+  filtered1channel = (channel <= (channelone + T1)) & (channel >= (channelone - T1))
+  filtered1channels = channel[filtered1channel]
+  filteredonecounts = counts[filtered1channel]
+
+  counts_plot = counts / livetime
+  filtered1counts_plot = filteredonecounts / livetime
+  ylabel = 'Count Rate (counts/s)'
+
+  fit_params, fwhm1, sig1 = paramsgenerator(filtered1counts_plot, channelone, filtered1channels)
+
+  result = lmfit.minimize(myfunc, fit_params,
+                          args=(filtered1channels.values, filtered1counts_plot.values))
+
+  center1 = result.params['cen'].value
+  amp1 = result.params['amp'].value
+  wid1 = result.params['wid'].value
+
+  gauss1 = Gau1(filtered1channels, amp1, center1, wid1)
+
+  if dec == 'Plot':
+    fig, ax = plt.subplots(figsize = (16, 6))
+
+    ax.plot(channel, counts_plot)
+    ax.scatter(filtered1channels, filtered1counts_plot, color = 'green', s = 30)
+
+    ax.axvline(x = maxone, c = 'black', linestyle = ':', label=f'Max: {maxone}')
+    ax.axvline(x = maxtwo, c = 'red', linestyle = ':', label=f'2nd: {maxtwo}')
+
+    ax.plot(filtered1channels, gauss1, color = 'orange', label = 'Gaussian fit 1', linewidth = 2)
+
+    ax.grid(True)
+    ax.legend()
+    ax.set_xlabel('Channel')
+    ax.set_ylabel(ylabel)
+    ax.set_title(f'Channel vs Count for {title} with {detname} detector')
+
+    plt.tight_layout()
+    plt.show()
+  print(f'Peak centroid in channel: {center1:.3f}')
+  return center1
+
+#######
+
+def calibcurvecalc(channels, guessenergies, detname):
+  gain, offset = np.polyfit(channels, guessenergies, 1)
+
+  print(f'Gain: {gain:.3f}, Offset: {offset:.3f}')
+
+  counter = 1
+  for channel, energy in zip(channels, energies):
+    calcenergy = channel * gain + offset
+    resid = calcenergy  - energy
+
+    print(f'Peak: {counter} | Residual: {resid}')
+    counter += 1
+
+  chanrange = np.linspace(0, max(channels) * 1.1, 1000)
+  line = gain * chanrange + offset
+
+  plt.figure(figsize=(6, 4))
+  plt.scatter(channels, energies, color='red', s=50, zorder=5, label='Calibration points')
+  plt.xlabel('Channels')
+  plt.ylabel('Energies (keV)')
+  plt.title(f'Calibration curve for detector: {detname}')
+  plt.plot(chanrange, line, 'b-', linewidth=2, label=f'E = {gain:.3f}×Ch + {offset:.3f}')
+  plt.grid(True)
+  plt.legend()
+
+  return gain, offset
+
+
+#######
+
+def resfinder(file, T, guess, title, detname, gain, offset):
+  channel = file.Channel
+  counts = file.Counts
+
+  energy = channel * gain + offset
+
+  n_peaks = 10
+  top = counts.nlargest(n_peaks).index
+
+  maxone = top[0]
+
+  for i in range(1, n_peaks):
+      if abs(top[i] - maxone) >= 5:
+          maxtwo = top[i]
+          break
+
+  if np.abs(maxone - guess) < 50:
+    channelone = maxone
+    print('Initial peak estimate good...')
+
+  elif np.abs(maxone - guess) > 50:
+    channelone = maxtwo
+    print('Initial peak estimate not good, going with second peak...')
+
+  else:
+    print('Warning: Guesses bad - No estimation of Peak center')
+
+  print()
+
+  filteredonechannel = (channel <= (channelone + T)) & (channel >= (channelone - T))
+  filteredonecounts = counts[filteredonechannel]
+  filteredonechannel = channel[filteredonechannel]
+
+  fit_params, fwhm1, sig1 = paramsgenerator(filteredonecounts, channelone, filteredonechannel)
+
+  result = lmfit.minimize(myfunc, fit_params,
+                          args=(filteredonechannel.values, filteredonecounts.values))
+
+  print("Fit success:", result.success)
+  print(f"Initial FWHM guess: {fwhm1:.3f} channels")
+
+  center1 = result.params['cen'].value
+  amp1 = result.params['amp'].value
+  wid1 = result.params['wid'].value
+
+  gauss1 = Gau1(filteredonechannel, amp1, center1, wid1)
+
+  center1_idx = int(round(center1))
+
+  energyatpeak1 = center1 * gain + offset
+
+  fwhmkev = fwhm1 * gain
+
+  print(f'Detector: {detname} | Isotope: {title}')
+
+  print(f'Peak FWHM: {fwhmkev:.3f} | Peak Energy: {energyatpeak1:.3f}')
+
+  Res = (fwhmkev / energyatpeak1) * 100
+  print(f'Detector Resolution: {Res:.3f}%')
+
+  return Res
+
+#######
+
+def resvenergyplotter(Reslist, energieslist):
+  if len(Reslist) == len(energieslist):
+    plt.scatter(energies, Reslist)
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.grid(True)
+    plt.xlabel('Known Energy Values (keV)')
+    plt.ylabel('Resolutions')
+    plt.show()
+
+
+#######
+
+def absefffinder(counts, livetime, activity):
+  countrate = counts.sum()/livetime
+
+  print(f'Count-rate = {countrate:.3f} cts/s')
+  abseff = countrate/ (activity * 37000)
+  print(f'Absolute Efficiency = {abseff * 100:.3f}%')
+
+  return abseff
