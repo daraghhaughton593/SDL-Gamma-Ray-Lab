@@ -219,4 +219,15 @@ def absefffinder(counts, livetime, activity):
   abseff = countrate/ (activity * 37000)
   print(f'Absolute Efficiency = {abseff * 100:.3f}%')
 
+
   return abseff
+
+
+#######
+
+def filenumtoangle(filename):
+  angle = re.findall(r'\d+', filename)
+
+  return angle
+
+filenumtoangle('Cs15degfile')
