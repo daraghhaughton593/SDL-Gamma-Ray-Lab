@@ -229,5 +229,32 @@ def filenumtoangle(filename):
 
 filenumtoangle('Cs15degfile')
 
+########
+
+def effsvsenergies(absefficiencies, insefficiencies, energies):
+  logenergy = np.log(energies)
+  absefflog = np.log(absefficiencies)
+  insefflog = np.log(insefficiencies)
+
+  coeffs = np.polyfit(logenergy, insefflog, 2)
+
+  espace = np.linspace(min(energies), max(energies), 100)
+  effectivefit = coeffs[2] + coeffs[1]*np.log(espace) + coeffs[0]*(np.log(espace))**2
+  expeffectfit = np.exp(effectivefit)
+
+  plt.scatter(energies, absefficiencies, c = 'blue', label = 'Absolute efficiencies')
+  plt.scatter(energies, insefficiencies, c = 'green', label = 'Absolute efficiencies')
+  plt.plot(espace, expeffectfit, ':', color = 'red', label = 'Polyfit of intrinsic efficiencies')
+
+  plt.xscale('log')
+  plt.yscale('log')
+
+  plt.xlabel('Energy Values (keV)')
+  plt.ylabel('Efficiencies')
+  plt.legend(loc = 'best')
+  plt.grid(True, which='both')
+  plt.show()
+
+
 
 
