@@ -212,13 +212,10 @@ def resvenergyplotter(fwhmlist, energieslist):
 
 #######
 
-def absefffinder(counts, livetime, activity, convfactor):
-  countrate = counts.sum()/livetime
-
+def absefffinder(countrate, livetime, activity):
   print(f'Count-rate = {countrate:.3f} cts/s')
-  abseff = countrate / (activity * convfactor)
+  abseff = countrate/ (activity * 37000)
   print(f'Absolute Efficiency = {abseff * 100:.3f}%')
-
 
   return abseff
 
@@ -231,5 +228,6 @@ def filenumtoangle(filename):
   return angle
 
 filenumtoangle('Cs15degfile')
+
 
 
