@@ -97,6 +97,11 @@ def file_reader(file):
 
 
     if exp_time <= 0:
-        exp_time = 1.0  
+        exp_time = 1.0 
+
+    df = pd.DataFrame({
+        "Channel": np.arange(len(counts), dtype=int),
+        "Counts": np.array(counts, dtype=float)/exp_time
+    })
     
-    return (counts / exp_time), channels
+    return df
