@@ -4,7 +4,8 @@ def file_reader(file):
     and returns counts normalized by live time (counts/s) and channels.
     """
 
-    ext = os.path.splitext(file)[1].lower()exp_time = 1.0  # default live time
+    ext = os.path.splitext(file)[1].lower()
+    exp_time = 1.0  # default live time
 
     # .SPE FILES --- --
     if ext == ".spe":
