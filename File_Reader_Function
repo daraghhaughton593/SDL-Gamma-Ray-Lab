@@ -1,0 +1,101 @@
+def file_reader(file):
+    """
+    Reads a spectrum data file (.spe or similar text-based format)
+    and returns counts normalized by live time (counts/s) and channels.
+    """
+
+    ext = os.path.splitext(file)[1].lower()exp_time = 1.0  # default live time
+
+    # .SPE FILES --- --
+    if ext == ".spe":
+        reading_data = False
+        exposure_time = False
+        counts = []
+        skip_line = False
+
+        with open(file, "r") as f:
+            data = f.readlines()
+
+        for line in data:
+            line = line.strip()
+            if not line:
+                continue  
+
+            # Detect start of exposure time section
+            if "MEAS_TIM" in line:
+                exposure_time = True
+                continue
+
+            # Read exposure time from next line
+            elif exposure_time:
+                stripped = line.split()
+                try:
+                    exp_time = float(stripped[0])
+                except (ValueError, IndexError):
+                    exp_time = 1.0
+                exposure_time = False
+                continue
+
+            # Start of data section
+            elif "data" in line.lower():
+                reading_data = True                            
+                skip_line = True   # One line is skipped (contains info on number of datalines)
+                continue  
+
+            # Read actual counts
+            elif reading_data:
+                if skip_line:
+                    skip_line = False
+                    continue
+
+                if line.startswith("$"):
+                    break
+
+                try:
+                    counts.append(float(line))
+                except ValueError:
+                    continue
+
+        counts = np.asarray(counts)
+        channels = np.arange(len(counts))
+
+    # .MCA FILES
+    else:
+        reading_data = False
+        counts = []
+
+        with open(file, "r") as f:
+            data = f.readlines()
+
+        for line in data:
+            line = line.strip()
+            if not line:
+                continue  
+            if line.startswith("LIVE_TIME"):
+                parts = line.split("-")
+                if len(parts) > 1:
+                    try:
+                        exp_time = float(parts[1].strip())
+                    except ValueError:
+                        exp_time = 1.0
+
+            elif line.lower() == "<<data>>":
+                reading_data = True
+                continue  
+
+            elif reading_data:
+                if line.startswith("<<"):
+                    break
+                try:
+                    counts.append(float(line))
+                except ValueError:
+                    continue
+
+        counts = np.asarray(counts)
+        channels = np.arange(len(counts))
+
+
+    if exp_time <= 0:
+        exp_time = 1.0  
+    
+    return (counts / exp_time), channels
