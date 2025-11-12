@@ -1,6 +1,3 @@
-
-
-
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.optimize as spo
@@ -12,6 +9,7 @@ import re
 import lmfit
 import pandas as pd
 import sys
+from scipy.optimize import curve_fit
 
 def load_yaml(file_path):
     """Safely load a YAML file and return its contents."""
@@ -187,42 +185,55 @@ def myfunc(params, x, data):
 #########
 
 
-def peakfinder(cps, channels, roi, source, detname, dec = None):
+def peakfinder(cps, channels, roi, source, detname, dec=None):
 
-  roi_mask = (channels>=roi[0])&(channels<= roi[1])
-  roi_channels = channels[roi_mask]
-  roi_counts = cps[roi_mask]
+    roi_mask = (channels >= roi[0]) & (channels <= roi[1])
+    roi_channels = channels[roi_mask]
+    roi_counts = cps[roi_mask]
 
+    idx_max = roi_counts.values.argmax()
+    channelone = roi_channels.iloc[idx_max]
 
-  idx_max = roi_counts.values.argmax()
-  channelone = roi_channels.iloc[idx_max]
+    fit_params, fwhm1, sig1 = paramsgenerator(roi_counts, channelone, roi_channels)
 
-  fit_params, fwhm1, sig1 = paramsgenerator(roi_counts, channelone, roi_channels)
+    result = lmfit.minimize(myfunc, fit_params,
+                            args=(roi_channels.values, roi_counts.values))
 
-  result = lmfit.minimize(myfunc, fit_params,
-                          args=(roi_channels.values, roi_counts.values))
+    centre = result.params['cen'].value
+    amp = result.params['amp'].value
+    wid = result.params['wid'].value
 
-  centre = result.params['cen'].value
-  amp = result.params['amp'].value
-  wid = result.params['wid'].value
+    # Extract uncertainties if available
+    amp_err = result.params['amp'].stderr
+    cen_err = result.params['cen'].stderr
+    wid_err = result.params['wid'].stderr
 
-  gauss = Gau1(roi_channels, amp, centre, wid)
+    gauss = Gau1(roi_channels, amp, centre, wid)
 
-  if dec == 'Plot':
-    plt.figure(figsize=(12, 5))
-    plt.plot(channels, cps, label='Spectrum')
-    plt.scatter(roi_channels, roi_counts, color='green', s=30, label='ROI points')
-    plt.plot(roi_channels, gauss, color='orange', lw=2, label='Gaussian fit')
-    plt.axvline(centre, color='red', linestyle='--', label=f'Fitted peak: {centre:.1f}')    
-    plt.xlabel('Channel')
-    plt.ylabel('Counts / s')
-    plt.title(f'{source} - {detname}')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+    if dec == 'Plot':
+        plt.figure(figsize=(12, 5))
+        plt.plot(channels, cps, label='Spectrum')
+        plt.scatter(roi_channels, roi_counts, color='green', s=30, label='ROI points')
+        plt.plot(roi_channels, gauss, color='orange', lw=2, label='Gaussian fit')
+        plt.axvline(centre, color='red', linestyle='--', label=f'Fitted peak: {centre:.1f}')    
+        plt.xlabel('Channel')
+        plt.ylabel('Counts / s')
+        plt.title(f'{source} - {detname}')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
 
-    print(f"Peak centroid in channel: {centre:.3f}")
-  return centre
+        print(f"Peak centroid in channel: {centre:.3f} ± {cen_err:.3f}")
+        print(f"Amplitude: {amp:.3f} ± {amp_err:.3f}")
+        print(f"Width (σ): {wid:.3f} ± {wid_err:.3f}")
+
+    # Return parameters and uncertainties
+    return {
+        'centre': centre, 'centre_err': cen_err,
+        'amplitude': amp, 'amplitude_err': amp_err,
+        'width': wid, 'width_err': wid_err
+    }
+
 
 #######
 
@@ -297,17 +308,69 @@ def resfinder(counts,channel, T, maxchannel, title, detname, gain, offset):
 
 #######
 
-def resvenergyplotter(Reslist, energieslist):
-  if len(Reslist) == len(energieslist):
-    plt.scatter(energieslist, Reslist)
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.grid(True)
+def res_approx(a,b,c,E):
+    """
+    This function returns the approximated peak resolution at a given peak energy.
 
-    plt.title("Resolutions for found Photopeaks")
-    plt.xlabel('Known Energy Values (keV)')
-    plt.ylabel('Resolutions')
-    plt.show()
+    Inputs:
+    a,b,c  - constants
+    E - Energy (keV)
+
+    Returns:
+    Resolution (keV)
+    """
+
+    return np.sqrt(a/E**(2) + b/E +c)
+
+def resvenergyplotter(Reslist, energieslist):
+  min_sep = 50
+  if len(Reslist) == len(energieslist):
+    # Filter peaks based on minimum separation
+    filtered_energies = []
+    filtered_res = []
+
+    last_energy = -np.inf
+    for E, R in sorted(zip(energieslist, Reslist)):
+        if E - last_energy >= min_sep:
+            filtered_energies.append(E)
+            filtered_res.append(R)
+            last_energy = E
+
+    plt.scatter(filtered_energies, filtered_res, label="Experimental Data", color='red')
+
+    try:
+        # Bounds are included to avoid square root of negative values.
+        popt, pcov = curve_fit(
+             res_approx, energieslist, Reslist,
+            p0=[1, 1, 1], bounds=(0, np.inf)
+            )
+        perr = np.sqrt(np.diag(pcov))
+
+        # Plot fitted curve
+        E_fit = np.logspace(np.log10(min(energieslist)), np.log10(max(energieslist)), 200)
+        Res_fit = res_approx(E_fit, *popt)
+        plt.plot(E_fit, Res_fit, color='blue', label="Fitted Curve")
+
+                    # Display fitted parameters + uncertainties
+        textstr = (f"a = {popt[0]:.2e} ± {perr[0]:.2e}\n"
+                    f"b = {popt[1]:.2e} ± {perr[1]:.2e}\n"
+                    f"c = {popt[2]:.2e} ± {perr[2]:.2e}")
+        plt.gca().text(0.05, 0.95, textstr, transform=plt.gca().transAxes,
+                fontsize=10, verticalalignment='top',
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+
+    except Exception as e:
+        print("Fit failed:", e)
+
+  plt.scatter(energieslist, Reslist)
+  plt.xscale('log')
+  plt.yscale('log')
+  plt.grid(True)
+
+  plt.title("Resolutions for found Photopeaks")
+  plt.xlabel('Known Energy Values (keV)')
+  plt.ylabel('Resolutions')
+  plt.show()
 
 
 #######
@@ -400,79 +463,6 @@ def decayconst(halflife):
 
 
 
-
-def microCi_2_Bq(microCi):
-    """
-    A function that converts from micro Curies to Becquerels.
-
-    Inputs:
-    microCi - Float: activity of source in microCi
-
-    Outputs:
-    Bq - Float: activity of the source in Becquerels
-
-    """
-    Bq = microCi*37_000
-    return Bq
-
-def activity(Element):
-    """
-    Compute activites of a source at time of measurments.
-
-    Input:
-    Element - String: element you wish to compute activity for,
-                      (Am, Ba, Co, Cs)
-
-    Output:
-    A - Float: The activity of the source at the time of measurement (05/11/25)
-
-    """
-
-    #load the data
-    data = load_yaml('Source_Info.yaml')
-
-    #load the activities and half-lives
-    A0_list = data['Activities']
-    halflives = data['Half-Life']
-
-    #iterate over keys to get the element
-    for key in A0_list:
-        if key == Element:
-            A0 = A0_list[key]
-            A0 = float(A0[0])
-            hl = halflives[key]
-            hl = hl[0]
-            break  # stop looping once found
-
-    #warning if string input is not an element in the yaml file
-    if A0_list is None:
-        print('WARNING: No Detector found')
-        return None
-
-
-    lam = decayconst(hl)
-    A0_bq = microCi_2_Bq(A0) #convert from micro Curies to bequerels
-    t = 1_449_446_148 #number of seconds passed since A0 was measured
-    A = A0_bq * np.exp(-lam * t)
-    return A
-
-def decayconst(halflife):
-    """
-    Calculates the Decay constant of an element once given its half-life in years.
-
-    Inputs:
-    halflife - Float: Halflife of element in years.
-
-    Outputs:
-    decay_constant - Float: Decay constant,  unit s^-1
-
-    """
-
-    halflifesec = halflife*365.25*24*60*60
-    decay_constant = np.log(2)/ halflifesec
-
-    return decay_constant
-
 def effsvsenergies(absefficiencies, insefficiencies, energies):
   logenergy = np.log(energies)
   absefflog = np.log(absefficiencies)
@@ -562,7 +552,7 @@ def angular_response(detector, yaml_info):
     files = file_storer(detector)
     back_cps = None
 
-    degrees, peak_heights, fwhms = [], [], []
+    degrees, peak_heights, peak_errs, fwhms, fwhm_errs = [], [], [],[],[]
 
 
     for file in files:
@@ -600,25 +590,34 @@ def angular_response(detector, yaml_info):
 
         # Amplitude and FWHM of peak determined from Gaussian fit.
         amp = result.params['amp'].value
+        amp_err = result.params['amp'].stderr
         cen = result.params['cen'].value
         wid = result.params['wid'].value
+        wid_err = result.params['wid'].stderr
+
         fwhm = wid * 2.355
+        fwhm_err = wid_err*2.355
 
         degrees.append(deg)
+
         peak_heights.append(amp)
+        peak_errs.append(amp_err)
+
         fwhms.append(fwhm)
+        fwhm_errs.append(fwhm_err)
+
 
     # Plot results
     plt.figure(figsize=(8,6))
     plt.subplot(2,1,1)
-    plt.plot(degrees, peak_heights, 'o-', label='Peak height')
+    plt.errorbar(degrees, peak_heights, yerr = peak_errs, fmt = 'o-', label='Peak height')
     plt.xlabel('Angle (degrees)')
     plt.ylabel('Peak height (counts)')
     plt.grid(True)
     plt.legend()
 
     plt.subplot(2,1,2)
-    plt.plot(degrees, fwhms, 'o-', color='red', label='FWHM')
+    plt.errorbar(degrees, fwhms,  yerr = fwhm_errs, fmt = 'o-',  color='red', label='FWHM')
     plt.xlabel('Angle (degrees)')
     plt.ylabel('FWHM (channels)')
     plt.grid(True)
@@ -626,6 +625,7 @@ def angular_response(detector, yaml_info):
 
     plt.tight_layout()
     plt.show()
+
 
 
 
@@ -701,12 +701,23 @@ def main(detector, dec=None):
             if not roi:
                 continue
 
-            peak_channel = peakfinder(cr, ch, roi, s, detector)
+            peak = peakfinder(cr, ch, roi, s, detector, dec)
+
+                    # Print parameters with uncertainties
+            print(f"Source: {s}")
+            print(f"  Centre = {peak['centre']:.3f} ± {peak['centre_err']:.3f}")
+            print(f"  Amplitude = {peak['amplitude']:.3f} ± {peak['amplitude_err']:.3f}")
+            print(f"  Width (σ) = {peak['width']:.3f} ± {peak['width_err']:.3f}\n")
+
+
+            peak_channel = peak['centre']
+            peak_channel_unc = peak['centre_err']
             if peak_channel is not None:
                 found_peaks.append({
                     'src':s,
                     'peak_idx': i,
                     'centre': peak_channel,
+                    'centre_err': peak_channel_unc,
                     'cr': cr,
                     'ch':ch,
                     't': t
@@ -752,11 +763,18 @@ def main(detector, dec=None):
     # Plot efficiency vs energy
     effsvsenergies(absol_eff, intrin_eff, energy_list)
 
+
     angular_response(detector, yaml_info)
 
 
 if __name__ == "__main__":
     args = sys.argv[1:]
-    main(args[0], args[1])
+    if len(args) == 1:
+        main(args[0])
+    elif len(args) == 2:
+        main(args[0], args[1])
+    else:
+        print("Usage: python gamma.py <detector> [plot]")
+
 
 
