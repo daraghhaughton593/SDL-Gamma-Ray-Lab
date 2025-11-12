@@ -24,16 +24,16 @@ spectrum_plots - if spectrum plots are wanted ("Plot"), otherwise no entry requi
 ## Libraries Required
 This script requires the following Python libraries:
 
-- numpy      	Numerical computations and array handling
-- matplotlib	Plotting and data visualization
-- scipy	      Scientific computing (optimization, signal processing, curve fitting)
-- yaml	      Reading and writing YAML configuration files
-- os	      Operating system interfaces (file paths, environment variables)
-- pathlib	Object-oriented filesystem paths
-- re	      Regular expression operations
-- lmfit	      Advanced curve fitting and model optimization
-- pandas	Data handling and tabular data analysis
-- sys	      System-specific parameters and command-line arguments
+- numpy   - Numerical computations and array handling
+- matplotlib	- Plotting and data visualization
+- scipy	      - Scientific computing (optimization, signal processing, curve fitting)
+- yaml	      - Reading and writing YAML configuration files
+- os	      - Operating system interfaces (file paths, environment variables)
+- pathlib	- Object-oriented filesystem paths
+- re	     -  Regular expression operations
+- lmfit	    -   Advanced curve fitting and model optimization
+- pandas	- Data handling and tabular data analysis
+- sys	    -   System-specific parameters and command-line arguments
 
 # Detectors used: 
 - i) CdTe (Cadmium Telluride) - Distance: 10.6 cm
