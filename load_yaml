@@ -1,5 +1,0 @@
-def load_yaml(file_path):
-    """Safely load a YAML file and return its contents."""
-    with open(file_path, 'r') as stream:
-        data = yaml.safe_load(stream)
-    return data
