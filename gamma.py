@@ -544,7 +544,7 @@ def Solid_Angle(detector, theta):
         return None
     r,h = Sizes
     r, h = r/1000, h/1000
-    Frac = (Angular_Detector_size(r,h,distance,15))/(4*np.pi)
+    Frac = (Angular_Detector_size(r,h,distance,theta))/(4*np.pi)
     return Frac
 
 
@@ -775,6 +775,7 @@ if __name__ == "__main__":
         main(args[0], args[1])
     else:
         print("Usage: python gamma.py <detector> [plot]")
+
 
 
 
