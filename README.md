@@ -17,7 +17,7 @@ The script can be called in the command line using the following format:
 python gamma.py detector_name spectrum_plots
 
 Here, the arguments detector_name and spectrum_plots are entered by the user depending on:
-. detector_name - the detector type desired ("CdTe", "BGO", "NaI")
+. detector_name - the detector type desired ("CdTe", "BGO", "NaI", "CdTe_Sample")
 . spectrum_plots - if spectrum plots are wanted ("Plot"), otherwise no entry required
 
 
