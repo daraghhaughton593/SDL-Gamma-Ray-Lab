@@ -35,7 +35,7 @@ This script requires the following Python libraries:
 - pandas	- Data handling and tabular data analysis
 - sys	    -   System-specific parameters and command-line arguments
 
-# Detectors used: 
+## Detectors used: 
 - i) CdTe (Cadmium Telluride) - Distance: 10.6 cm
 - ii) NaTI (Soidum Thallumide) - Distance: 16 cm
 - iii) BGO (Bismuth Germanate) - Distance: 15 cm
