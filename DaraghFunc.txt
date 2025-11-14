@@ -215,7 +215,26 @@ def resvenergyplotter(fwhmlist, energieslist):
 #######
 
 def absefffinder(counts, livetime, activity):
+  """
+  Function calculates detector absolute efficiency and uncertainties
 
+  Paremeters:
+  counts : array
+    array of counts
+  livetime : float
+    measurement time in seconds
+  activity : float
+    Activity of source in bq
+
+  Returns:
+    abseff : float
+      absolute efficiency of detector
+    absefferr : float
+      absolute efficiency error of detector
+
+  Notes:
+    Uses Poisson statistics for uncertainties
+  """
   total_counts = float(counts.sum())
   lt = float(livetime)
 
@@ -269,12 +288,48 @@ def effsvsenergies(absefficiencies, insefficiencies, energies):
 #########
 
 def peakerrcalcer(peakE, centroiderrval, gain):
+  """
+  Function calculates and prints the peak energy and uncertainty
+
+  Parameters:
+    peakE : float
+      Peak energy in keV
+    centroiderrval : float
+      uncertainty in centroid position in channel
+    gain : float
+      calibration value
+
+  Returns:
+    None
+  """
   delE = centroiderrval * gain
   print(f'Peak energy =  {peakE:.3f} +/- {delE:.3f} (keV)')
 
 #########
 
 def RESerrorcalcer(R, sigval, sigerr, gain, peakE, peakEerr):
+  """
+    Function calculates and prints energy resolution and uncertainty.
+    
+    Parameters
+    R : float
+        Resolution (%)
+    sigval : float
+        Gaussian width sigma (channels)
+    sigerr : float
+        Uncertainty in sigma (channels)
+    gain : float
+        Energy calibration gain (keV/channel)
+    peakE : float
+        Peak energy in keV
+    peakEerr : float
+        Uncertainty in peak energy in keV
+    
+    Returns
+    None
+        Prints resolution with propagated uncertainty.
+  """
+
   FWHM = sigval * 2.355
   delFWHM = sigerr * 2.355
 
@@ -284,3 +339,4 @@ def RESerrorcalcer(R, sigval, sigerr, gain, peakE, peakEerr):
   delR = R * np.sqrt(((FWHMeErr/FWHMe)**2) + ((peakEerr/peakE)**2))
 
   print(f'Resolution = {R:.3f} +/- {delR:.3f}')
+
