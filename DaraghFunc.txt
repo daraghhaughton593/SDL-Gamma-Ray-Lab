@@ -1,3 +1,5 @@
+The following functions were made by Daragh, and adapted by Caimin or Daragh for use in the main analysis pipeline, 'gamma.py'
+
 def Gau1(data, a, b, c):
   return (a * np.exp(-(data - b)**2 / (2 * c**2)))
 
@@ -212,12 +214,21 @@ def resvenergyplotter(fwhmlist, energieslist):
 
 #######
 
-def absefffinder(countrate, livetime, activity):
-  print(f'Count-rate = {countrate:.3f} cts/s')
-  abseff = countrate/ (activity * 37000)
-  print(f'Absolute Efficiency = {abseff * 100:.3f}%')
+def absefffinder(counts, livetime, activity):
 
-  return abseff
+  total_counts = float(counts.sum())
+  lt = float(livetime)
+
+  countrate = total_counts/lt
+  countrateerr = np.sqrt(total_counts)/lt
+
+  print(f'Count-rate = {countrate:.3f} +/- {countrateerr} cts/s')
+  abseff = (countrate / (activity)) * 100
+  absefferr = (countrateerr / (activity)) * 100
+  print(f'Absolute Efficiency = {abseff * 100:.3f} +/- {absefferr * 100:.3f}%')
+  print()
+
+  return abseff, absefferr
 
 
 #######
@@ -259,7 +270,7 @@ def effsvsenergies(absefficiencies, insefficiencies, energies):
 
 def peakerrcalcer(peakE, centroiderrval, gain):
   delE = centroiderrval * gain
-  print(f'Peak energy =  {peakE} +/- {delE} (keV)')
+  print(f'Peak energy =  {peakE:.3f} +/- {delE:.3f} (keV)')
 
 #########
 
@@ -272,9 +283,4 @@ def RESerrorcalcer(R, sigval, sigerr, gain, peakE, peakEerr):
 
   delR = R * np.sqrt(((FWHMeErr/FWHMe)**2) + ((peakEerr/peakE)**2))
 
-  print(f'Resolution = {R} +/- {delR:.3f}')
-
-
-
-
-
+  print(f'Resolution = {R:.3f} +/- {delR:.3f}')
