@@ -255,6 +255,26 @@ def effsvsenergies(absefficiencies, insefficiencies, energies):
   plt.grid(True, which='both')
   plt.show()
 
+#########
+
+def peakerrcalcer(peakE, centroiderrval, gain):
+  delE = centroiderrval * gain
+  print(f'Peak energy =  {peakE} +/- {delE} (keV)')
+
+#########
+
+def RESerrorcalcer(R, sigval, sigerr, gain, peakE, peakEerr):
+  FWHM = sigval * 2.355
+  delFWHM = sigerr * 2.355
+
+  FWHMe = FWHM * gain
+  FWHMeErr = delFWHM * gain
+
+  delR = R * np.sqrt(((FWHMeErr/FWHMe)**2) + ((peakEerr/peakE)**2))
+
+  print(f'Resolution = {R} +/- {delR:.3f}')
+
+
 
 
 
