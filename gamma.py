@@ -202,8 +202,62 @@ def myfunc(params, x, data):
 
     return model - data
 
+##########
+
+def peakerrcalcer(peakE, centroiderrval, gain):
+  """
+  Function calculates and prints the peak energy and uncertainty
+
+  Parameters:
+    peakE : float
+      Peak energy in keV
+    centroiderrval : float
+      uncertainty in centroid position in channel
+    gain : float
+      calibration value
+
+  Returns:
+    None
+  """
+  delE = centroiderrval * gain
+  print(f'Peak energy =  {peakE:.3f} +/- {delE:.3f} (keV)')
+
 #########
 
+def RESerrorcalcer(R, sigval, sigerr, gain, peakE, peakEerr):
+  """
+    Function calculates and prints energy resolution and uncertainty.
+    
+    Parameters
+    R : float
+        Resolution (%)
+    sigval : float
+        Gaussian width sigma (channels)
+    sigerr : float
+        Uncertainty in sigma (channels)
+    gain : float
+        Energy calibration gain (keV/channel)
+    peakE : float
+        Peak energy in keV
+    peakEerr : float
+        Uncertainty in peak energy in keV
+    
+    Returns
+    None
+        Prints resolution with propagated uncertainty.
+  """
+
+  FWHM = sigval * 2.355
+  delFWHM = sigerr * 2.355
+
+  FWHMe = FWHM * gain
+  FWHMeErr = delFWHM * gain
+
+  delR = R * np.sqrt(((FWHMeErr/FWHMe)**2) + ((peakEerr/peakE)**2))
+
+  print(f'Resolution = {R:.3f} +/- {delR:.3f}')
+
+#########
 
 def peakfinder(cps, channels, roi, source, detname, dec=None):
 
@@ -306,8 +360,10 @@ def resfinder(counts,channel, T, maxchannel, title, detname, gain, offset):
   print(f"Initial FWHM guess: {fwhm1:.3f} channels")
 
   centre1 = result.params['cen'].value
+  centre1err = result.params['cen'].stderr
   amp1 = result.params['amp'].value
   wid1 = result.params['wid'].value
+  wid1err = result.params['wid'].stderr
 
   gauss1 = Gau1(filteredonechannel, amp1, centre1, wid1)
 
@@ -319,10 +375,14 @@ def resfinder(counts,channel, T, maxchannel, title, detname, gain, offset):
 
   print(f'Detector: {detname} | Isotope: {title}')
 
-  print(f'Peak FWHM: {fwhmkev:.3f} | Peak Energy: {energyatpeak1:.3f}')
+  print(f'Peak FWHM: {fwhmkev:.3f}')# | Peak Energy: {energyatpeak1:.3f}')
 
   Res = (fwhmkev / energyatpeak1) * 100
-  print(f'Detector Resolution: {Res:.3f}%')
+
+  energyerr = centre1err * gain
+  peakerrcalcer(energyatpeak1, centre1err, gain)
+
+  RESerrorcalcer(Res, wid1, wid1err, gain, energyatpeak1, energyerr)
 
   return Res
 
@@ -387,17 +447,39 @@ def resvenergyplotter(Reslist, energieslist):
 #######
 
 def absefffinder(counts, livetime, activity):
+  """
+  Function calculates detector absolute efficiency and uncertainties
 
+  Paremeters:
+  counts : array
+    array of counts
+  livetime : float
+    measurement time in seconds
+  activity : float
+    Activity of source in bq
+
+  Returns:
+    abseff : float
+      absolute efficiency of detector
+    absefferr : float
+      absolute efficiency error of detector
+
+  Notes:
+    Uses Poisson statistics for uncertainties
+  """
   total_counts = float(counts.sum())
   lt = float(livetime)
 
   countrate = total_counts/lt
+  countrateerr = np.sqrt(total_counts)/lt
 
-  print(f'Count-rate = {countrate:.3f} cts/s')
-  abseff = countrate/ (activity)
-  print(f'Absolute Efficiency = {abseff * 100:.3f}%')
+  print(f'Count-rate = {countrate:.3f} +/- {countrateerr} cts/s')
+  abseff = (countrate / (activity)) * 100
+  absefferr = (countrateerr / (activity)) * 100
+  print(f'Absolute Efficiency = {abseff * 100:.3f} +/- {absefferr * 100:.3f}%')
+  print()
 
-  return abseff
+  return abseff, absefferr
 
 
 def microCi_2_Bq(microCi):
@@ -741,7 +823,7 @@ def main(detector, dec=None):
     # Compute solid angle of detector for on-axis sources.
     sol_angle = Solid_Angle(detector, 0)
 
-    res_list, energy_list, absol_eff = [], [], []
+    res_list, energy_list, absol_eff, absol_efferr = [], [], [], []
 
     # Resolutions and efficiencies are calculated for each fitted peak.
     for f in found_peaks:
@@ -760,18 +842,22 @@ def main(detector, dec=None):
 
         # Absolute efficiency
         activ = activity(src)
-        a_eff = absefffinder(cr, t, activ)
+        a_eff, a_efferr = absefffinder(cr, t, activ)
         absol_eff.append(a_eff)
+        absol_efferr.append(a_efferr)
 
     # Convert absolute to intrinsic efficiency
     intrin_eff = [a_eff / sol_angle for a_eff in absol_eff]
+    intrin_efferr = [a_efferr / sol_angle for a_efferr in absol_efferr]
+
+    for eff, err in zip(intrin_eff, intrin_efferr):
+      print(f'Intrinsic Efficiency = {eff:.3} +/- {err:.3}%')
 
     # Plot resolution vs energy
     resvenergyplotter(res_list, energy_list)
 
     # Plot efficiency vs energy
     effsvsenergies(absol_eff, intrin_eff, energy_list)
-
 
     angular_response(detector, yaml_info)
 
@@ -784,6 +870,7 @@ if __name__ == "__main__":
         main(args[0], args[1])
     else:
         print("Usage: python gamma.py <detector> [plot]")
+
 
 
 
