@@ -1,3 +1,4 @@
+
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.optimize as spo
@@ -12,13 +13,29 @@ import sys
 from scipy.optimize import curve_fit
 
 def load_yaml(file_path):
-    """Safely load a YAML file and return its contents."""
+    """Safely load a YAML file and return its contents.
+
+    Inputs:
+    file_path - location and name of YAML file
+
+    Returns:
+    data - all data within the YAML file
+    """
     with open(file_path, 'r') as stream:
         data = yaml.safe_load(stream)
     return data
 
 
 def filenumtoangle(filename):
+  """
+  Extracts the measurement angle from an entered filename
+
+  Input:
+  Filename - e.g. BGO_Ba15deg.Spe
+
+  Returns:
+  Degree of measurement used for file.
+  """
   angles = re.findall(r'\d+', filename)
 
   return int(angles[0])
@@ -26,6 +43,9 @@ def filenumtoangle(filename):
 def file_storer(detector):
     """
     Finds all relevant files for detector type
+
+    Input:
+    Detector Name - "BGO", "CdTe"
 
     """
     # The DATA folder is defined as the location to look for data files.
@@ -307,70 +327,61 @@ def resfinder(counts,channel, T, maxchannel, title, detname, gain, offset):
   return Res
 
 #######
-
-def res_approx(a,b,c,E):
+def resvenergyplotter(Reslist, energieslist):
     """
-    This function returns the approximated peak resolution at a given peak energy.
+    Plots resolution vs energy and fits ΔE^2 = a + bE + cE^2
 
     Inputs:
-    a,b,c  - constants
-    E - Energy (keV)
-
-    Returns:
-    Resolution (keV)
+    Reslist - relative resolution values (ΔE/E)
+    energieslist - corresponding energies in keV
     """
+    # Convert relative resolution to ΔE in keV
+    deltaE_list = np.array(Reslist) * np.array(energieslist)
+    deltaE2_list = deltaE_list**2
 
-    return np.sqrt(a/E**(2) + b/E +c)
-
-def resvenergyplotter(Reslist, energieslist):
-  min_sep = 50
-  if len(Reslist) == len(energieslist):
-    # Filter peaks based on minimum separation
+    # Filter peaks based on minimum separation (optional)
+    min_sep = 50
     filtered_energies = []
-    filtered_res = []
-
+    filtered_deltaE2 = []
     last_energy = -np.inf
-    for E, R in sorted(zip(energieslist, Reslist)):
+    for E, dE2 in sorted(zip(energieslist, deltaE2_list)):
         if E - last_energy >= min_sep:
             filtered_energies.append(E)
-            filtered_res.append(R)
+            filtered_deltaE2.append(dE2)
             last_energy = E
 
-    plt.scatter(filtered_energies, filtered_res, label="Experimental Data", color='red')
+    # Scatter plot of experimental ΔE^2
+    plt.scatter(filtered_energies, np.sqrt(filtered_deltaE2), color='red', label='Experimental Data')
 
     try:
-        # Bounds are included to avoid square root of negative values.
-        popt, pcov = curve_fit(
-             res_approx, energieslist, Reslist,
-            p0=[1, 1, 1], bounds=(0, np.inf)
-            )
+        # Fit ΔE^2 = a + bE + cE^2
+        popt, pcov = curve_fit(lambda E, a, b, c: a + b*E + c*E**2,
+                               filtered_energies, filtered_deltaE2, p0=[1,1,1], bounds=(0, np.inf))
         perr = np.sqrt(np.diag(pcov))
 
-        # Plot fitted curve
-        E_fit = np.logspace(np.log10(min(energieslist)), np.log10(max(energieslist)), 200)
-        Res_fit = res_approx(E_fit, *popt)
-        plt.plot(E_fit, Res_fit, color='blue', label="Fitted Curve")
+        # Plot fitted curve in ΔE (keV)
+        E_fit = np.logspace(np.log10(min(filtered_energies)), np.log10(max(filtered_energies)), 200)
+        deltaE_fit = np.sqrt(popt[0] + popt[1]*E_fit + popt[2]*E_fit**2)
+        plt.plot(E_fit, deltaE_fit, color='blue')
 
-                    # Display fitted parameters + uncertainties
+        # Display fitted parameters in top-right corner
         textstr = (f"a = {popt[0]:.2e} ± {perr[0]:.2e}\n"
-                    f"b = {popt[1]:.2e} ± {perr[1]:.2e}\n"
-                    f"c = {popt[2]:.2e} ± {perr[2]:.2e}")
+                   f"b = {popt[1]:.2e} ± {perr[1]:.2e}\n"
+                   f"c = {popt[2]:.2e} ± {perr[2]:.2e}")
         plt.gca().text(0.05, 0.95, textstr, transform=plt.gca().transAxes,
-                fontsize=10, verticalalignment='top',
-                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+                       fontsize=10, verticalalignment='top', horizontalalignment='left',
+                       bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
 
     except Exception as e:
         print("Fit failed:", e)
 
-  plt.scatter(energieslist, Reslist)
-  plt.xscale('log')
-  plt.yscale('log')
-  plt.grid(True)
-
-  plt.title("Resolutions for found Photopeaks")
-  plt.xlabel('Known Energy Values (keV)')
-  plt.ylabel('Resolutions')
-  plt.show()
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.grid(True, which='both')
+    plt.xlabel('Energy (keV)')
+    plt.ylabel('ΔE (keV)')
+    plt.title("Resolution vs Energy")
+    plt.show()
 
 
 #######
@@ -496,8 +507,8 @@ def Angular_Detector_size(diam, h, dist, theta):
     Compute the approximate solid angle subtended by a cylindrical detector.
 
     Inputs:
-    diam - Float: diameter of detector in mm
-    h - Float: height of the detetctor in mm
+    diam - Float: diameter of detector in m
+    h - Float: height of the detetctor in m
     dist-Float: Distance to detector in m
     theta - Float: angle the detector is at in degrees
 
@@ -507,7 +518,7 @@ def Angular_Detector_size(diam, h, dist, theta):
     """
 
     theta = theta*np.pi/180
-    A = np.pi*(diam/2)**2*np.cos(theta)+diam*h*np.sin(theta)
+    A = (np.pi*(diam/2)**2)*(np.cos(theta))+(diam*h*np.sin(theta))
     omega = A/(dist**2)
     return omega
 
@@ -617,7 +628,7 @@ def angular_response(detector, yaml_info):
     plt.legend()
 
     plt.subplot(2,1,2)
-    plt.errorbar(degrees, fwhms,  yerr = fwhm_errs, fmt = 'o-',  color='red', label='FWHM')
+    plt.errorbar(degrees, fwhms ,  yerr = fwhm_errs, fmt = 'o-',  color='red', label='FWHM')
     plt.xlabel('Angle (degrees)')
     plt.ylabel('FWHM (channels)')
     plt.grid(True)
@@ -636,6 +647,8 @@ def main(detector, dec=None):
     - Subtracts Background
     - Performs Calibration
     """
+    plt.close('all')
+
     files = file_storer(detector)
 
     yaml_info = load_yaml("Source_Info.yaml")
@@ -679,8 +692,6 @@ def main(detector, dec=None):
     source_rois = [yaml_info["ROIs"][detector][src] for src in on_axis_sources]
 
     centres = []
-    seen = set()
-
 
     unique_source_data = {}
 
@@ -689,7 +700,6 @@ def main(detector, dec=None):
             continue  # only 0° files
         if s not in unique_source_data:
             unique_source_data[s] = (cr, ch, float(t))
-
 
     found_peaks = []
 
@@ -722,7 +732,6 @@ def main(detector, dec=None):
                     'ch':ch,
                     't': t
                 })
-
     # Calibration Process
     centres = [f['centre'] for f in found_peaks]
     exp_energies = [yaml_info["Peaks"][f['src']][f['peak_idx']] for f in found_peaks]
@@ -775,7 +784,6 @@ if __name__ == "__main__":
         main(args[0], args[1])
     else:
         print("Usage: python gamma.py <detector> [plot]")
-
 
 
 
