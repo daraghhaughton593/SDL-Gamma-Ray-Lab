@@ -221,20 +221,19 @@ def paramsgenerator(counts, max, channel):
     fwhm (float) - estimate of full-width at half maximum of the peak in question
     sig (float) - standard deviation derived from the fwhm 
     """
-
-  fit_params = lmfit.Parameters()
-  amp = counts.max()
-  centre = max
-  halfh = amp/2
-  inds = np.where(counts >= halfh)[0]
-  fwhm = channel.values[inds[-1]] - channel.values[inds[0]]
-  sig = fwhm / 2.355
-
-  fit_params.add('amp', value=amp, min = 0)
-  fit_params.add('cen', value=centre, min = center - 20, max = centre + 20)
-  fit_params.add('wid', value=sig, min = 0.5)
-
-  return fit_params, fwhm, sig
+    fit_params = lmfit.Parameters()
+    amp = counts.max()
+    centre = max
+    halfh = amp/2
+    inds = np.where(counts >= halfh)[0]
+    fwhm = channel.values[inds[-1]] - channel.values[inds[0]]
+    sig = fwhm / 2.355
+        
+    fit_params.add('amp', value=amp, min = 0)
+    fit_params.add('cen', value=centre, min = center - 20, max = centre + 20)
+    fit_params.add('wid', value=sig, min = 0.5)
+        
+    return fit_params, fwhm, sig
 
 #########
 
@@ -1000,6 +999,7 @@ if __name__ == "__main__":
         main(args[0], args[1])
     else:
         print("Usage: python gamma.py <detector> [plot]")
+
 
 
 
