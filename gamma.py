@@ -21,6 +21,7 @@ def load_yaml(file_path):
     Returns:
     data - all data within the YAML file
     """
+    
     with open(file_path, 'r') as stream:
         data = yaml.safe_load(stream)
     return data
@@ -45,7 +46,11 @@ def file_storer(detector):
     Finds all relevant files for detector type
 
     Input:
-    Detector Name - "BGO", "CdTe"
+    Detector Name - BGO, CdTe
+
+    Returns:
+    files - list of files related to that detector
+    
 
     """
     # The DATA folder is defined as the location to look for data files.
@@ -58,14 +63,13 @@ def file_storer(detector):
 
 def file_reader(file):
     """
-    Reads a spectrum data file (.spe or similar text-based format)
-    and returns counts normalized by live time (counts/s) and channels.
+    Reads a spectrum data file (.spe or .mca)
+    and returns counts normalized by live time (counts/s), channels and the exposure time.
     """
-
+    # The type of file is saved to the variable 'ext'
     ext = os.path.splitext(file)[1].lower()
-    exp_time = 1.0  # default live time
 
-    # .SPE FILES --- --
+    # .SPE FILES
     if ext == ".spe":
         reading_data = False
         exposure_time = False
@@ -92,17 +96,20 @@ def file_reader(file):
                     exp_time = float(stripped[0])
                 except (ValueError, IndexError):
                     exp_time = 1.0
+                # exposure_time boolean reset to False
                 exposure_time = False
                 continue
 
             # Detect start of data section
             elif "data" in line.lower():
+                # Booleans for data extraction set to True
                 reading_data = True
                 skip_line = True
                 continue  
 
             # Read actual counts
             elif reading_data:
+                # One line skipped before data reading begins.
                 if skip_line:
                     skip_line = False
                     continue
@@ -138,7 +145,7 @@ def file_reader(file):
                         exp_time = float(parts[1].strip())
                     except ValueError:
                         exp_time = 1.0
-
+            # Different format for .mca files
             elif line.lower() == "<<data>>":
                 reading_data = True
                 continue  
@@ -154,10 +161,10 @@ def file_reader(file):
         counts = np.asarray(counts)
         channels = np.arange(len(counts))
 
-
     if exp_time <= 0:
         exp_time = 1.0  
 
+    # Extracted data converted to pandas dataframe for use in subsequent functions.
     df = pd.DataFrame({
         "Channel": np.arange(len(counts), dtype=int),
         "Counts": np.array(counts, dtype=float)/exp_time,
@@ -167,26 +174,63 @@ def file_reader(file):
     return df
 
 def Gau1(data, a, b, c):
+  """
+  returns the value of a Gaussian fit with constants a,b and c.
+
+  Inputs:
+  data (series) - data to be fitted.
+  a,b,c - constants to be fitted
+
+  Returns: 
+  Value of Gaussian fit at each data point.
+  """
+    
   return (a * np.exp(-(data - b)**2 / (2 * c**2)))
 
 #########
 
 def line(x, a, b):
+"""
+Fits a straight line to a set of data
+
+Inputs:
+x (series) - data points
+a, b - constants to be fitted.
+
+Returns:
+Value of line at each data point (x)
+"""
+
   return a * x + b
 
 #########
 
 def paramsgenerator(counts, max, channel):
+    """
+    This function generates and saves initial input parameters for a Gaussian fitting process. It calculates estimates for the amplitude, centre wavelength, full-width at half maximum and
+    standard deviation (sigma).
+
+    Inputs:
+    counts (series) - set of counts per second figures
+    max (float) - previously identified channel of peak counts
+    channel (series) - set of channel figures
+
+    Returns:
+    fit_params (lmfit.parameters) - A set of input parameters for use in Gaussian fitting 
+    fwhm (float) - estimate of full-width at half maximum of the peak in question
+    sig (float) - standard deviation derived from the fwhm 
+    """
+
   fit_params = lmfit.Parameters()
   amp = counts.max()
-  center = max
+  centre = max
   halfh = amp/2
   inds = np.where(counts >= halfh)[0]
   fwhm = channel.values[inds[-1]] - channel.values[inds[0]]
   sig = fwhm / 2.355
 
   fit_params.add('amp', value=amp, min = 0)
-  fit_params.add('cen', value=center, min = center - 20, max = center + 20)
+  fit_params.add('cen', value=centre, min = center - 20, max = centre + 20)
   fit_params.add('wid', value=sig, min = 0.5)
 
   return fit_params, fwhm, sig
@@ -194,6 +238,18 @@ def paramsgenerator(counts, max, channel):
 #########
 
 def myfunc(params, x, data):
+    """
+    This function is defined to be fed to the lmfit.minimize function. It involves the unpacking of the initial parameters calculated by paramsgenerator and the generation of a Gaussian fit.
+    The function then returns the residual found between this fit and the experimental data.
+
+    Inputs:
+    params (lmfit.parameters) - set of parameters as calculated by paramsgenerator
+    x (series) - channel data (independent variable)
+    data (series) - counts data (dependent variable) to be fitted with Gaussian.
+
+    Returns:
+    model - data (series) - set of residuals describing the discrepancy between the Gaussian fit and the experimental data.
+    """
     amp = params['amp'].value
     cen = params['cen'].value
     wid = params['wid'].value
@@ -260,30 +316,50 @@ def RESerrorcalcer(R, sigval, sigerr, gain, peakE, peakEerr):
 #########
 
 def peakfinder(cps, channels, roi, source, detname, dec=None):
+    """
+    This function looks at a specified region of interest (roi) and identifies a peak therein. A Gaussian fit is then applied to this peak using lmfit, and the fitted 
+    parameters along with their respective uncertainties are extracted. The fitted parameters are then used to produce a plot of the fit overlaid on the spectrum, which 
+    can be viewed by the user if the Plot argument is entered.
 
+    Inputs:
+    cps (series) - the counts per second data series
+    channels (series) - the channel numbers 
+    roi (list) - list of relevant regions of interest from YAML file
+    source (string) - the radioactive source that produced the spectrum
+    detname (string) - the type of detector being used (BGO, NaI, CdTe, CdTe_Sample)
+    dec - optional argument to produce plots of spectra
+    """
+
+    # The region of interest in defined as a mask.
     roi_mask = (channels >= roi[0]) & (channels <= roi[1])
     roi_channels = channels[roi_mask]
     roi_counts = cps[roi_mask]
 
+    # The maximum counts figure within the masked region is determined and the corresponding channel is saved
     idx_max = roi_counts.values.argmax()
     channelone = roi_channels.iloc[idx_max]
-
+    
+    # The estimated parameters are generated 
     fit_params, fwhm1, sig1 = paramsgenerator(roi_counts, channelone, roi_channels)
 
+    # A minimization fitting process is carried out, which returns fitted parameters that minimize the residuals of the fitted model.
     result = lmfit.minimize(myfunc, fit_params,
                             args=(roi_channels.values, roi_counts.values))
 
+    # The fitted parameters are extracted from the minimization results
     centre = result.params['cen'].value
     amp = result.params['amp'].value
     wid = result.params['wid'].value
 
-    # Extract uncertainties if available
+    # Uncertainties extracted if available
     amp_err = result.params['amp'].stderr
     cen_err = result.params['cen'].stderr
     wid_err = result.params['wid'].stderr
 
+    # Gaussian data generated using fitted parameters.
     gauss = Gau1(roi_channels, amp, centre, wid)
 
+    # Plots generated if requested.
     if dec == 'Plot':
         plt.figure(figsize=(12, 5))
         plt.plot(channels, cps, label='Spectrum')
@@ -312,10 +388,24 @@ def peakfinder(cps, channels, roi, source, detname, dec=None):
 #######
 
 def calibcurvecalc(channels, guessenergies, detname):
+  """
+  This function produces a calibration curve that illustrates the relation between the channel numbers and their corresponding energy values. 
+  The relation should resemble a line, which is plotted
+
+  Inputs:
+  channels (series) - channel figures corresponding to identified peaks in spectra
+  guessenergues (list) - expected energies of peaks identified (loaded in from YAML file)
+  detname (string) - Name of detector type
+
+  Returns:
+  gain, offset (floats) - slope (gain) and intercept (offset) of fitted calibration curve relating channels and energy
+  """
+  # gain and offset calculated using a linear fit
   gain, offset = np.polyfit(channels, guessenergies, 1)
 
   print(f'Gain: {gain:.3f}, Offset: {offset:.3f}')
 
+  # Each peak energy's distance to the fitted line is calculated and printed as a residual
   counter = 1
   for channel, energy in zip(channels, guessenergies):
     calcenergy = channel * gain + offset
@@ -344,6 +434,9 @@ def calibcurvecalc(channels, guessenergies, detname):
 #######
 
 def resfinder(counts,channel, T, maxchannel, title, detname, gain, offset):
+  """
+  The resolution of each peak is calculated by dividing the fwhm by the intensity of the peak in question. 
+  """
 
   energy = channel * gain + offset
 
@@ -392,8 +485,11 @@ def resvenergyplotter(Reslist, energieslist):
     Plots resolution vs energy and fits ΔE^2 = a + bE + cE^2
 
     Inputs:
-    Reslist - relative resolution values (ΔE/E)
-    energieslist - corresponding energies in keV
+    Reslist (list) - relative resolution values (ΔE/E)
+    energieslist (list) - corresponding energies in keV
+
+    Returns:
+    None (plots the resolutions for desired detector)
     """
     # Convert relative resolution to ΔE in keV
     deltaE_list = np.array(Reslist) * np.array(energieslist)
@@ -557,6 +653,18 @@ def decayconst(halflife):
 
 
 def effsvsenergies(absefficiencies, insefficiencies, energies):
+  """
+  Produces logarithmic plot of the absolute and intrinsic efficiencies found for each peak identified for a given detector.
+  Fits a curve to the intrinsic efficiencies to visualise relation.
+
+  Inputs: 
+  absefficiencies (list) - set of absolute efficiencies returned by absefffinder
+  insefficiencies (list) - set of corresponding intrinsic effiencies, once the solid angle of the detector is accounted for
+  energies (list) - set of peak energies for fitting and plotting the relation curve
+
+  Returns:
+  None 
+  """
   logenergy = np.log(energies)
   absefflog = np.log(absefficiencies)
   insefflog = np.log(insefficiencies)
@@ -642,6 +750,17 @@ def Solid_Angle(detector, theta):
 
 
 def angular_response(detector, yaml_info):
+    """
+    This function appraises the detectors response at various angles of source location. The source used for this was Caesium as it was the most active.
+    Peak heights and resolutions (fwhm) are calculated and plotted as a function of offset angle (in degrees)
+
+    Inputs:
+    detector (string) - name of detector type
+    yaml_info (lists) - set of lists containing all data relevant to the alignment of the detector setup and the areas of interest for the Caesium peak (662 keV)
+
+    Returns:
+    None (Plots of peak heights and fwhm with respect to the angle of deviation from on-axis position)
+    """
     files = file_storer(detector)
     back_cps = None
 
@@ -724,15 +843,21 @@ def angular_response(detector, yaml_info):
 
 def main(detector, dec=None):
     """
-    Processes files for entered detector
+    - Processes files for entered detector
     - Takes Counts and Channels
     - Subtracts Background
+    - Identifies peaks in spectra
     - Performs Calibration
+    - Performs Resolution calculations and presentation
+    - Computes efficiencies for each identified peak and presents them
+    - Appraises off-axis response of detector
     """
     plt.close('all')
 
+    # The files relevant to the detector entered are gathered and stored.
     files = file_storer(detector)
 
+    # The YAML file data is loaded in
     yaml_info = load_yaml("Source_Info.yaml")
 
     count_rates = []
@@ -742,6 +867,7 @@ def main(detector, dec=None):
     livetimes = []
     back_cps = None
 
+    # A number of lists are occupied with appropriate data from data files.
     for file in files:
         name = file.name.lower()
 
@@ -765,12 +891,13 @@ def main(detector, dec=None):
         sources.append(source) 
         livetimes.append(float(livetime))
 
+    # on-axis information is stored separately for easier access
     on_axis_channels = [ch for ch, d in zip(channels,degrees) if d ==0]
     on_axis_counts = [cr for cr, d in zip(count_rates, degrees) if d ==0]
     on_axis_sources = [s for s, d in zip(sources, degrees) if d == 0]
     on_axis_livetimes = [t for t, d in zip(livetimes, degrees) if d ==0]
 
-
+    # regions of interest for each source are loaded in from YAML data.
     source_rois = [yaml_info["ROIs"][detector][src] for src in on_axis_sources]
 
     centres = []
@@ -785,6 +912,7 @@ def main(detector, dec=None):
 
     found_peaks = []
 
+    # Each region of interest from the YAML file is used to search the spectra and return the peaks location in terms of channel number.
     for s, (cr, ch, t) in unique_source_data.items():
         rois = yaml_info["ROIs"][detector][s]
         if not rois:
@@ -795,13 +923,13 @@ def main(detector, dec=None):
 
             peak = peakfinder(cr, ch, roi, s, detector, dec)
 
-                    # Print parameters with uncertainties
+            # Print parameters with uncertainties
             print(f"Source: {s}")
             print(f"  Centre = {peak['centre']:.3f} ± {peak['centre_err']:.3f}")
             print(f"  Amplitude = {peak['amplitude']:.3f} ± {peak['amplitude_err']:.3f}")
             print(f"  Width (σ) = {peak['width']:.3f} ± {peak['width_err']:.3f}\n")
 
-
+            # The identified peaks are stored in dictionary form.
             peak_channel = peak['centre']
             peak_channel_unc = peak['centre_err']
             if peak_channel is not None:
@@ -824,7 +952,7 @@ def main(detector, dec=None):
     sol_angle = Solid_Angle(detector, 0)
 
     res_list, energy_list, absol_eff, absol_efferr = [], [], [], []
-
+    
     # Resolutions and efficiencies are calculated for each fitted peak.
     for f in found_peaks:
         src = f['src']
@@ -859,6 +987,7 @@ def main(detector, dec=None):
     # Plot efficiency vs energy
     effsvsenergies(absol_eff, intrin_eff, energy_list)
 
+    # Plot Peak heights and FWHMs w.r.t off-axis angle
     angular_response(detector, yaml_info)
 
 
@@ -870,6 +999,7 @@ if __name__ == "__main__":
         main(args[0], args[1])
     else:
         print("Usage: python gamma.py <detector> [plot]")
+
 
 
 
