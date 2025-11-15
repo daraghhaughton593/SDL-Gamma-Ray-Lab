@@ -190,18 +190,19 @@ def Gau1(data, a, b, c):
 #########
 
 def line(x, a, b):
-"""
-Fits a straight line to a set of data
+    
+    """
+    Fits a straight line to a set of data
+    
+    Inputs:
+    x (series) - data points
+    a, b - constants to be fitted.
+    
+    Returns:
+    Value of line at each data point (x)
+    """
 
-Inputs:
-x (series) - data points
-a, b - constants to be fitted.
-
-Returns:
-Value of line at each data point (x)
-"""
-
-  return a * x + b
+    return a * x + b
 
 #########
 
@@ -999,6 +1000,7 @@ if __name__ == "__main__":
         main(args[0], args[1])
     else:
         print("Usage: python gamma.py <detector> [plot]")
+
 
 
 
