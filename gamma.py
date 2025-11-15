@@ -230,7 +230,7 @@ def paramsgenerator(counts, max, channel):
     sig = fwhm / 2.355
         
     fit_params.add('amp', value=amp, min = 0)
-    fit_params.add('cen', value=centre, min = center - 20, max = centre + 20)
+    fit_params.add('cen', value=centre, min = centre - 20, max = centre + 20)
     fit_params.add('wid', value=sig, min = 0.5)
         
     return fit_params, fwhm, sig
@@ -999,6 +999,7 @@ if __name__ == "__main__":
         main(args[0], args[1])
     else:
         print("Usage: python gamma.py <detector> [plot]")
+
 
 
 
