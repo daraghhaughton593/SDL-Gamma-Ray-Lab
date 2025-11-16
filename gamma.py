@@ -569,7 +569,7 @@ def absefffinder(counts, livetime, activity):
   countrate = total_counts/lt
   countrateerr = np.sqrt(total_counts)/lt
 
-  print(f'Count-rate = {countrate:.3f} +/- {countrateerr} cts/s')
+  print(f'Count-rate = {countrate:.3f} +/- {countrateerr:.3f} cts/s')
   abseff = (countrate / (activity)) * 100
   absefferr = (countrateerr / (activity)) * 100
   print(f'Absolute Efficiency = {abseff * 100:.3f} +/- {absefferr * 100:.3f}%')
@@ -1000,6 +1000,7 @@ if __name__ == "__main__":
         main(args[0], args[1])
     else:
         print("Usage: python gamma.py <detector> [plot]")
+
 
 
 
