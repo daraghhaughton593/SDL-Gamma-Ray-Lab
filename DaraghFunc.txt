@@ -1,16 +1,74 @@
-The following functions were made by Daragh, and adapted by Caimin or Daragh for use in the main analysis pipeline, 'gamma.py'
+The following functions and docstrings were made by Daragh, and adapted by Caimin or Daragh for use in the main analysis pipeline, 'gamma.py'.
+Notes: 
+i) As Caimin had to adapt some of these functions for the pipeline, separate docstrings were created in the pipeline by him to accurately reflect the functions use within the pipeline.
+ii) Please see comments on GenAI use below. These were omitted from the primary pipeline in the interest of keeping it readable and neat. 
+iii) The specific GenAI model used for assistance was: ChatGPT-4-Turbo
 
 def Gau1(data, a, b, c):
+  """
+  Function that calculates a Gaussian distribution function
+
+  Parameters:
+    data : array
+      Points over which the Gaussian is evaluated
+    a : float
+      Amplitude of Gaussian (or peak height)
+    b : float
+      Centre of Gaussian (or peak centre)
+    c : float
+      Standard deviation of Gaussian (or peak spread)
+
+  Return:
+    array
+      Gaussian function evaluated at data points
+  """
   return (a * np.exp(-(data - b)**2 / (2 * c**2)))
 
 #########
 
 def line(x, a, b):
+  """
+  Parameters:
+    x : array
+      Points over which the linear function is evaluated
+    a : float
+      Slope of line
+    b : float
+      Intercept of line
+
+   Return:
+    array
+      Linear function evaluated at data points
+  """
+
   return a * x + b
 
 #########
 
 def paramsgenerator(counts, max, channel):
+  """
+  Function generates initial parameters to be sued in Gaussian peak fit
+
+  Parameters:
+  counts : array
+    array of count values representing peak intensity
+  max : float
+    estimated position of the peak center (where peak height is max)
+  channel : array
+    array of channel values
+
+  Return:
+    fit_params : lmfit.Parameters
+        Initial guesses for:
+        - 'amp': amplitude (peak height), min = 0
+        - 'cen': center position, +/- 20
+        - 'wid': width (standard deviation), min = 0.5
+    fwhm : float
+        Full width at half maximum of the peak.
+    sig : float
+        Estimated standard deviation of the peak.
+    
+  """
   fit_params = lmfit.Parameters()
   amp = counts.max()
   center = max
@@ -28,6 +86,26 @@ def paramsgenerator(counts, max, channel):
 #########
 
 def myfunc(params, x, data):
+  """
+  Function calculates residuals between fitted Gaussian and input data
+
+  Parameters:
+  params : lmfit.Parameters
+    Initial guesses for:
+        - 'amp': amplitude (peak height), min = 0
+        - 'cen': center position, +/- 20
+        - 'wid': width (standard deviation), min = 0.5
+  x : array
+    data to be fitted using the Gau1 function
+
+  data : array
+    data values to be subtracted from the model to produced residuals
+
+  Return:
+    model - data : array
+      Residuals between Gaussian and data
+    
+  """
     amp = params['amp'].value
     cen = params['cen'].value
     wid = params['wid'].value
@@ -39,8 +117,37 @@ def myfunc(params, x, data):
 #########
 
 def peakfinder(file, guess, livetime, title, detname, T1, dec = None):
+  """
+    Function finds and fits a Gaussian peak to data in specified range of centre guess
+    
+    Parameters
+    file : DataFrame
+        DataFrame containing 'Channel' and 'Counts' columns
+    guess : float
+        Initial guess for the peak channel position
+    livetime : float
+        Measurement live time in seconds, used to convert counts to count rate
+    title : str
+        Isoptope name, for plot titling purposes
+    detname : str
+        Name of the detector used for measurement, again for plot titling and printing purposes
+    T1 : float
+        Region size either side of centre peak position which will be fitted
+    dec : str, optional
+        If 'Plot', displays a plot of the data and fit
+        Defaults to None if no dec argument given
+    
+    Returns
+    float
+        Fitted peak centroid position in channel units
+
+    Notes:
+      Function optionally plots the channel vs counts spectrum, with the sliced region highlighted and the peak fit plotted.
+  """
   channel = file.Channel
   counts = file.Counts
+
+  #GenAI was used here. While finding the initial largest peak was fine, finding the second largest when the initial peak guess was unsuccessful was not as easy. As such, GenAI suggested counts.nlargest().index,   finding the top n peaks via this method, and selecting the second peak that is sufficienctly separated from the first (at least 5 channels away).
 
   n_peaks = 10
   top = counts.nlargest(n_peaks).index
@@ -108,6 +215,25 @@ def peakfinder(file, guess, livetime, title, detname, T1, dec = None):
 #######
 
 def calibcurvecalc(channels, guessenergies, detname):
+  """
+  Function calculates and plots calibration curve for detector
+
+  Parameters:
+    channels : array
+        array of channel numbers corresponding to known peaks
+    guessenergies : array
+        array of known energies (in keV) corresponding to the channels
+    detname : str
+        Name of the detector being calibrated
+
+  Return:
+      gain : float
+        The slope of the calibration plot
+
+      offset : float
+        The y-intercept of the calibration plot
+    
+  """
   gain, offset = np.polyfit(channels, guessenergies, 1)
 
   print(f'Gain: {gain:.3f}, Offset: {offset:.3f}')
@@ -138,6 +264,32 @@ def calibcurvecalc(channels, guessenergies, detname):
 #######
 
 def resfinder(file, T, guess, title, detname, gain, offset):
+  """
+  Function calculates energy resolution of a detector.
+
+  Parameters
+    file : DataFrame
+        DataFrame containing 'Channel' and 'Counts' columns
+    T : float
+        Region size either side of centre peak position which will be fitted
+    guess : float
+        Initial guess for the peak channel position
+    title : str
+        Isoptope name, for plot titling purposes
+    detname : str
+        Name of the detector used for measurement, again for plot titling and printing purposes
+    gain : float
+      Gain factor from calibration step
+    offset : float
+      Energy offset factor from calibration step
+
+  Returns:
+    Res : float
+      The energy resolution as a percentage
+    fwhmkev : float
+      The Full width at half maximum in keV
+  
+  """
   channel = file.Channel
   counts = file.Counts
 
@@ -202,6 +354,21 @@ def resfinder(file, T, guess, title, detname, gain, offset):
 #######
 
 def resvenergyplotter(fwhmlist, energieslist):
+  """
+  Function plots FWHM vs known energy values in keV
+
+  Parameters:
+    fwhmlist : list of floats
+      list of FWHM values for different sources, in keV
+    energieslist :  list of floats
+      list of known peak energy values for different sources, in keV
+
+  Return:
+    None
+
+  Notes:
+    Function produces logarithmic plot of known peak energy vs FWHM, both in keV
+  """
   if len(fwhmlist) == len(energieslist):
     plt.scatter(energies, fwhmlist)
     plt.xscale('log')
@@ -235,6 +402,7 @@ def absefffinder(counts, livetime, activity):
   Notes:
     Uses Poisson statistics for uncertainties
   """
+
   total_counts = float(counts.sum())
   lt = float(livetime)
 
@@ -253,20 +421,53 @@ def absefffinder(counts, livetime, activity):
 #######
 
 def filenumtoangle(filename):
+  """
+  Function extracts digits from a filename to determine angle
+
+  Parameters:
+    filename : str
+      Filename string which should contain angle digits
+
+  Return:
+    str
+      Numerical angle found in the filename
+  """
+
+  #GenAI was used here. Andrew suggested the use of Regex for finding numbers within strings, but GenAI was needed to provide specific direction for using it in finding numbers in strings. As such, GenAI provided the syntax for using Regex to find numbers within strings.
+
   angle = re.findall(r'\d+', filename)
 
   return angle
 
-filenumtoangle('Cs15degfile')
-
 ########
 
 def effsvsenergies(absefficiencies, insefficiencies, energies):
+  """
+  Function produces a logarithmic plot of absolute and intrinsic efficiencies as a function of known energy value, with a polynomial fit fitted to intrinsic efficiency data
+
+  Parameters:
+    absefficiencies : array
+      array of calculated absolute efficiency values for each energy
+    insefficiencies : array
+      array of calculated intrinsic efficiency values for each energy
+    energies : array
+      array of known peak energy values
+
+  Return:
+    None
+
+  Notes:
+    Function produces a logarithmic plot of absolute and intrinsic efficiency vs energy. Also plotted is a polynomial fit, fitted to the intrinsic efficiency vs energy data
+
+    The polynomial used is a second order polynomial provided in the lab manual 
+  """
   logenergy = np.log(energies)
   absefflog = np.log(absefficiencies)
   insefflog = np.log(insefficiencies)
 
   coeffs = np.polyfit(logenergy, insefflog, 2)
+
+  # GenAI was used below. Initially, the function would plot the fit using the original energy values directly, but this produced a discontinuous curve. GenAI suggested using np.linspace, and the max and minimum known energy values to create a continuous energy space with lots of points, over which to fit the second order polynomial. This produced a smooth fit line. 
 
   espace = np.linspace(min(energies), max(energies), 100)
   effectivefit = coeffs[2] + coeffs[1]*np.log(espace) + coeffs[0]*(np.log(espace))**2
@@ -339,4 +540,3 @@ def RESerrorcalcer(R, sigval, sigerr, gain, peakE, peakEerr):
   delR = R * np.sqrt(((FWHMeErr/FWHMe)**2) + ((peakEerr/peakE)**2))
 
   print(f'Resolution = {R:.3f} +/- {delR:.3f}')
-
