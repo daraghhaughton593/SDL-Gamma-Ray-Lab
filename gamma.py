@@ -851,6 +851,7 @@ def main(detector, dec=None):
     - Performs Resolution calculations and presentation
     - Computes efficiencies for each identified peak and presents them
     - Appraises off-axis response of detector
+    ChatGPT was consulted to ensure that each function received inputs in the correct format and returned outputs compatible for further processing
     """
     plt.close('all')
 
@@ -999,6 +1000,7 @@ if __name__ == "__main__":
         main(args[0], args[1])
     else:
         print("Usage: python gamma.py <detector> [plot]")
+
 
 
 
