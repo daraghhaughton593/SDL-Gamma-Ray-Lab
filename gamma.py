@@ -542,15 +542,14 @@ def resvenergyplotter(Reslist, energieslist):
 
 #######
 
-def absefffinder(counts, livetime, activity):
+def absefffinder(countrates, livetime, activity):
   """
   Function calculates detector absolute efficiency and uncertainties
 
   Paremeters:
-  counts : array
-    array of counts
-  livetime : float
-    measurement time in seconds
+  countrates : array
+    array of countrates
+    
   activity : float
     Activity of source in bq
 
@@ -563,15 +562,13 @@ def absefffinder(counts, livetime, activity):
   Notes:
     Uses Poisson statistics for uncertainties
   """
-  total_counts = float(counts.sum())
-  lt = float(livetime)
+  total_countrates = float(counts.sum())
 
-  countrate = total_counts/lt
-  countrateerr = np.sqrt(total_counts)/lt
+  countrateerr = np.sqrt(total_countrates)
 
   print(f'Count-rate = {countrate:.3f} +/- {countrateerr:.3f} cts/s')
-  abseff = (countrate / (activity)) * 100
-  absefferr = (countrateerr / (activity)) * 100
+  abseff = (countrate / (activity)) 
+  absefferr = (countrateerr / (activity)) 
   print(f'Absolute Efficiency = {abseff * 100:.3f} +/- {absefferr * 100:.3f}%')
   print()
 
@@ -1000,6 +997,7 @@ if __name__ == "__main__":
         main(args[0], args[1])
     else:
         print("Usage: python gamma.py <detector> [plot]")
+
 
 
 
