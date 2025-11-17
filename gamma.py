@@ -564,7 +564,7 @@ def absefffinder(countrates, livetime, activity):
   """
   total_countrates = float(countrates.sum())
 
-  countrateerr = np.sqrt(total_countrates)
+  countrateerr = np.sqrt(total_countrates/livetime)
 
   print(f'Count-rate = {total_countrates:.3f} +/- {countrateerr:.3f} cts/s')
   abseff = (total_countrates / (activity)) 
@@ -997,6 +997,7 @@ if __name__ == "__main__":
         main(args[0], args[1])
     else:
         print("Usage: python gamma.py <detector> [plot]")
+
 
 
 
