@@ -562,7 +562,7 @@ def absefffinder(countrates, livetime, activity):
   Notes:
     Uses Poisson statistics for uncertainties
   """
-  total_countrates = float(counts.sum())
+  total_countrates = float(countrates.sum())
 
   countrateerr = np.sqrt(total_countrates)
 
@@ -997,6 +997,7 @@ if __name__ == "__main__":
         main(args[0], args[1])
     else:
         print("Usage: python gamma.py <detector> [plot]")
+
 
 
 
