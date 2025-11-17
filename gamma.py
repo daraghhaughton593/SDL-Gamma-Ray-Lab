@@ -708,7 +708,7 @@ def Angular_Detector_size(diam, h, dist, theta):
     """
 
     theta = theta*np.pi/180
-    A = (np.pi*(diam/2)**2)*(np.cos(theta))+(diam*h*np.sin(theta))
+    A = abs((np.pi*(diam/2)**2)*(np.cos(theta)))+abs((diam*h*np.sin(theta)))
     omega = A/(dist**2)
     return omega
 
@@ -1000,6 +1000,7 @@ if __name__ == "__main__":
         main(args[0], args[1])
     else:
         print("Usage: python gamma.py <detector> [plot]")
+
 
 
 
