@@ -1,8 +1,9 @@
-The following functions and docstrings were made by Daragh, and adapted by Caimin or Daragh for use in the main analysis pipeline, 'gamma.py'.
+The following functions and docstrings were made by Daragh, and adapted by Caimin for use in the main analysis pipeline, 'gamma.py'.
 Notes: 
 i) As Caimin had to adapt some of these functions for the pipeline, separate docstrings were created in the pipeline by him to accurately reflect the functions use within the pipeline.
 ii) Please see comments on GenAI use below. These were omitted from the primary pipeline in the interest of keeping it readable and neat. 
 iii) The specific GenAI model used for assistance was: ChatGPT-4-Turbo
+iv) Majority of pipeline adaptation was done by Caimin. I only added the error functions seen at the bottom.
 
 def Gau1(data, a, b, c):
   """
@@ -181,6 +182,7 @@ def peakfinder(file, guess, livetime, title, detname, T1, dec = None):
 
   fit_params, fwhm1, sig1 = paramsgenerator(filtered1counts_plot, channelone, filtered1channels)
 
+  # See https://lmfit.github.io/lmfit-py/fitting.html for more on below
   result = lmfit.minimize(myfunc, fit_params,
                           args=(filtered1channels.values, filtered1counts_plot.values))
 
@@ -296,6 +298,9 @@ def resfinder(file, T, guess, title, detname, gain, offset):
   energy = channel * gain + offset
 
   n_peaks = 10
+
+  #From previous use above: GenAI was used here. While finding the initial largest peak was fine, finding the second largest when the initial peak guess was unsuccessful was not as easy. As such, GenAI suggested    counts.nlargest().index, finding the top n peaks via this method, and selecting the second peak that is sufficienctly separated from the first (at least 5 channels away).
+
   top = counts.nlargest(n_peaks).index
 
   maxone = top[0]
@@ -324,6 +329,7 @@ def resfinder(file, T, guess, title, detname, gain, offset):
 
   fit_params, fwhm1, sig1 = paramsgenerator(filteredonecounts, channelone, filteredonechannel)
 
+  # see https://lmfit.github.io/lmfit-py/fitting.html for more on below
   result = lmfit.minimize(myfunc, fit_params,
                           args=(filteredonechannel.values, filteredonecounts.values))
 
@@ -540,3 +546,4 @@ def RESerrorcalcer(R, sigval, sigerr, gain, peakE, peakEerr):
   delR = R * np.sqrt(((FWHMeErr/FWHMe)**2) + ((peakEerr/peakE)**2))
 
   print(f'Resolution = {R:.3f} +/- {delR:.3f}')
+
