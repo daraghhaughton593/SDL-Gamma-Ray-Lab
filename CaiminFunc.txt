@@ -1,0 +1,89 @@
+def angular_response(detector, yaml_info):
+    """
+    This function appraises the detectors response at various angles of source location. The source used for this was Caesium as it was the most active.
+    Peak heights and resolutions (fwhm) are calculated and plotted as a function of offset angle (in degrees)
+
+    Inputs:
+    detector (string) - name of detector type
+    yaml_info (lists) - set of lists containing all data relevant to the alignment of the detector setup and the areas of interest for the Caesium peak (662 keV)
+
+    Returns:
+    None (Plots of peak heights and fwhm with respect to the angle of deviation from on-axis position)
+    """
+    files = file_storer(detector)
+    back_cps = None
+
+    degrees, peak_heights, peak_errs, fwhms, fwhm_errs = [], [], [],[],[]
+
+
+    for file in files:
+        name = file.name.lower()
+        if "background" in name:
+            back_df = file_reader(file)
+            back_cps = back_df.Counts
+            continue
+
+        # Angled measurements only taken for Caesium. Ignore other sources.
+        if "cs" not in name:
+            continue
+
+        df = file_reader(file)
+        cps = df.Counts
+        ch = df.Channel
+        bg_subtract = cps - back_cps
+
+        deg = filenumtoangle(name)
+
+        # Only one ROI for Caesium (662 keV)
+        roi = yaml_info["ROIs"][detector]["Cs"][0]  
+        if not roi:
+            continue
+
+        # ROI mask applied
+        roi_mask = (ch >= roi[0]) & (ch <= roi[1])
+        roi_counts = bg_subtract[roi_mask]
+        roi_channels = ch[roi_mask]
+
+        # Gaussian fitted to data to extract amplitude.
+        peak_ch = roi_channels.iloc[roi_counts.values.argmax()]
+        fit_params, fwhm_ch, sig = paramsgenerator(roi_counts, peak_ch, roi_channels)
+        result = lmfit.minimize(myfunc, fit_params, args=(roi_channels.values, roi_counts.values))
+
+        # Amplitude and FWHM of peak determined from Gaussian fit.
+        amp = result.params['amp'].value
+        amp_err = result.params['amp'].stderr
+        cen = result.params['cen'].value
+        wid = result.params['wid'].value
+        wid_err = result.params['wid'].stderr
+
+        fwhm = wid * 2.355
+        fwhm_err = wid_err*2.355
+
+        degrees.append(deg)
+
+        peak_heights.append(amp)
+        peak_errs.append(amp_err)
+
+        fwhms.append(fwhm)
+        fwhm_errs.append(fwhm_err)
+
+
+    # Plot results
+    plt.figure(figsize=(8,6))
+    plt.subplot(2,1,1)
+    plt.errorbar(degrees, peak_heights, yerr = peak_errs, fmt = 'o-', label='Peak height')
+    plt.xlabel('Angle (degrees)')
+    plt.ylabel('Peak height (counts)')
+    plt.grid(True)
+    plt.legend()
+
+    plt.subplot(2,1,2)
+    plt.errorbar(degrees, fwhms ,  yerr = fwhm_errs, fmt = 'o-',  color='red', label='FWHM')
+    plt.xlabel('Angle (degrees)')
+    plt.ylabel('FWHM (channels)')
+    plt.grid(True)
+    plt.legend()
+
+    plt.tight_layout()
+    plt.show()
+
